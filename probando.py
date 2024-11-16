@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
 import sqlite3
-import matplotlib.pyplot as plt # type: ignore
-import pandas as pd # type: ignore
+import matplotlib.pyplot as plt
+import pandas as pd
 import datetime
 from cryptography.fernet import Fernet
 
