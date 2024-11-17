@@ -247,7 +247,7 @@ label_cargando = tk.Label(root, text="", font=("Arial", 12), bg="#E0F7FA", fg="r
 
 # Botones de análisis
 frame_grafico = tk.Frame(root, bg="#E0F7FA")
-frame_grafico.pack(pady=20, padx=10)
+frame_grafico.pack(pady=20, padx=15)
 
 ttk.Button(frame_grafico, text="Ver Análisis de Gastos", command=mostrar_analisis).pack(fill="x", pady=5)
 ttk.Button(frame_grafico, text="Ver Progreso Mensual", command=mostrar_progreso_mensual).pack(fill="x", pady=5)
