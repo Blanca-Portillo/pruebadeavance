@@ -66,7 +66,6 @@ def actualizar_progreso():
     conn.close()
 
 def mostrar_analisis():
-    # Usamos threading para evitar que la interfaz se congele
     label_cargando.config(text="Generando gráfico, por favor espere...")
     label_cargando.pack(pady=5)
     thread = threading.Thread(target=generar_grafico_analisis)
@@ -88,12 +87,10 @@ def generar_grafico_analisis():
         messagebox.showinfo("Sin datos", "No hay gastos registrados para analizar.")
     conn.close()
 
-    # Eliminar el mensaje de carga
     label_cargando.config(text="")
     label_cargando.pack_forget()
 
 def mostrar_progreso_mensual():
-    # Usamos threading para evitar que la interfaz se congele
     label_cargando.config(text="Generando gráfico, por favor espere...")
     label_cargando.pack(pady=5)
     thread = threading.Thread(target=generar_grafico_progreso_mensual)
@@ -117,22 +114,81 @@ def generar_grafico_progreso_mensual():
     df_gastos = pd.DataFrame(gastos_mensuales, columns=["Mes", "Gastos"])
 
     df = pd.merge(df_ingresos, df_gastos, on="Mes", how="outer").fillna(0)
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=df["Mes"], y=df["Ingresos"], name="Ingresos", marker_color="lightseagreen"))
-    fig.add_trace(go.Bar(x=df["Mes"], y=df["Gastos"], name="Gastos", marker_color="lightcoral"))
-    fig.update_layout(barmode="group", title="Progreso Mensual: Ingresos vs Gastos", template="plotly_white")
-    fig.show()
 
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=df["Mes"], 
+        y=df["Ingresos"], 
+        name="Ingresos", 
+        marker_color="lightseagreen", 
+        width=0.1  # Hacer las barras más delgadas (ancho más pequeño)
+    ))
+
+    fig.add_trace(go.Bar(
+        x=df["Mes"], 
+        y=df["Gastos"], 
+        name="Gastos", 
+        marker_color="lightcoral", 
+        width=0.1  # Hacer las barras más delgadas (ancho más pequeño)
+    ))
+
+    fig.update_layout(
+        barmode="group", 
+        title="Progreso Mensual: Ingresos vs Gastos", 
+        template="plotly_white",
+        height=1500,  # Aumentar la altura del gráfico
+        margin={"t": 50, "b": 50, "l": 50, "r": 50}  # Ajustar márgenes si es necesario
+    )
+
+    fig.show()
     conn.close()
 
-    # Eliminar el mensaje de carga
     label_cargando.config(text="")
     label_cargando.pack_forget()
+
+
+def simular_presupuesto():
+    presupuesto_texto = entry_presupuesto.get()
+    
+    # Verificar si el campo está vacío
+    if not presupuesto_texto:
+        messagebox.showerror("Error", "Por favor, ingresa un presupuesto.")
+        return
+    
+    try:
+        presupuesto = float(presupuesto_texto)
+    except ValueError:
+        messagebox.showerror("Error", "El presupuesto debe ser un número válido.")
+        return
+    
+    conn = obtener_conexion()
+    cursor = conn.cursor()
+    cursor.execute("SELECT SUM(monto) FROM gastos")
+    gastos_totales = cursor.fetchone()[0] or 0
+    saldo_restante = presupuesto - gastos_totales
+    messagebox.showinfo("Simulador de Presupuesto", f"Saldo restante: {saldo_restante:.2f} USD")
+    conn.close()
+
+def ver_presupuesto():
+    presupuesto_texto = entry_presupuesto.get()
+    
+    if not presupuesto_texto:
+        messagebox.showerror("Error", "Por favor, ingresa un presupuesto.")
+        return
+    
+    try:
+        presupuesto = float(presupuesto_texto)
+    except ValueError:
+        messagebox.showerror("Error", "El presupuesto debe ser un número válido.")
+        return
+    
+    messagebox.showinfo("Presupuesto Total", f"Tu presupuesto total es: {presupuesto:.2f} USD")
 
 # Interfaz principal
 root = tk.Tk()
 root.title("Gestión de Finanzas Personales")
-root.geometry("500x700")
+root.geometry("500x750")
 root.config(bg="#E0F7FA")
 
 # Estilo moderno
@@ -172,18 +228,28 @@ entry_categoria.set('')
 
 ttk.Button(frame, text="Agregar Gasto", command=agregar_gasto).grid(row=5, column=0, columnspan=2, pady=10)
 
-# Progreso y análisis
-label_progreso = tk.Label(root, text="Progreso: 0 USD", font=("Arial", 14, "bold"), bg="#E0F7FA", fg="#00796B")
+# Presupuesto
+tk.Label(frame, text="Presupuesto Total (USD)", font=("Arial", 12), bg="#E0F7FA", fg="#004D40").grid(row=6, column=0, pady=5, sticky="w")
+entry_presupuesto = tk.Entry(frame, font=("Arial", 12))
+entry_presupuesto.grid(row=6, column=1, pady=5)
+
+ttk.Button(frame, text="Simular Presupuesto", command=simular_presupuesto).grid(row=7, column=0, columnspan=2, pady=10)
+
+# Botón para ver presupuesto
+ttk.Button(frame, text="Ver Presupuesto", command=ver_presupuesto).grid(row=8, column=0, columnspan=2, pady=10)
+
+# Progreso
+label_progreso = tk.Label(root, text="Progreso: 0.00 USD", font=("Arial", 14), bg="#E0F7FA", fg="#004D40")
 label_progreso.pack(pady=10)
 
-label_cargando = tk.Label(root, text="", font=("Arial", 12), bg="#E0F7FA", fg="#004D40")
+# Cargando
+label_cargando = tk.Label(root, text="", font=("Arial", 12), bg="#E0F7FA", fg="red")
 
-ttk.Button(root, text="Ver Análisis de Gasto por Categoría", command=mostrar_analisis).pack(pady=10)
+# Botones de análisis
+frame_grafico = tk.Frame(root, bg="#E0F7FA")
+frame_grafico.pack(pady=20, padx=10)
 
-ttk.Button(root, text="Ver Progreso Mensual", command=mostrar_progreso_mensual).pack(pady=10)
+ttk.Button(frame_grafico, text="Ver Análisis de Gastos", command=mostrar_analisis).pack(fill="x", pady=5)
+ttk.Button(frame_grafico, text="Ver Progreso Mensual", command=mostrar_progreso_mensual).pack(fill="x", pady=5)
 
-# Cargar progreso al inicio
-actualizar_progreso()
-
-# Ejecutar la interfaz
 root.mainloop()
