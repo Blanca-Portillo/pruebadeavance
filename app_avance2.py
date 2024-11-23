@@ -22,11 +22,21 @@ def validar_fecha(fecha):
         return False
 
 def agregar_ingreso():
-    monto = float(entry_ingreso.get())
+    monto = entry_ingreso.get()
     fecha = entry_fecha.get()
+
+    if not monto:
+        messagebox.showerror("Error", "Por favor, ingresa el monto del ingreso.")
+        return
 
     if not validar_fecha(fecha):
         messagebox.showerror("Error", "La fecha no es válida. Debe estar en formato YYYY-MM-DD.")
+        return
+
+    try:
+        monto = float(monto)
+    except ValueError:
+        messagebox.showerror("Error", "El monto debe ser un número válido.")
         return
 
     conn = obtener_conexion()
@@ -38,21 +48,31 @@ def agregar_ingreso():
     actualizar_progreso()
 
 def agregar_gasto():
-    monto = float(entry_gasto.get())
+    monto = entry_gasto.get()
     categoria = entry_categoria.get()
-    fecha = entry_fecha.get()
 
-    if not validar_fecha(fecha):
-        messagebox.showerror("Error", "La fecha no es válida. Debe estar en formato YYYY-MM-DD.")
+    if not monto:
+        messagebox.showerror("Error", "Por favor, ingresa el monto del gasto.")
+        return
+
+    if not categoria:
+        messagebox.showerror("Error", "Por favor, selecciona una categoría de gasto.")
+        return
+
+    try:
+        monto = float(monto)
+    except ValueError:
+        messagebox.showerror("Error", "El monto debe ser un número válido.")
         return
 
     conn = obtener_conexion()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO gastos (monto, categoria, fecha) VALUES (?, ?, ?)", (monto, categoria, fecha))
+    cursor.execute("INSERT INTO gastos (monto, categoria) VALUES (?, ?)", (monto, categoria))
     conn.commit()
     conn.close()
     messagebox.showinfo("Gasto agregado", "Gasto registrado correctamente.")
     actualizar_progreso()
+
 
 def actualizar_progreso():
     conn = obtener_conexion()
@@ -146,12 +166,9 @@ def generar_grafico_progreso_mensual():
 
     label_cargando.config(text="")
     label_cargando.pack_forget()
-
-
 def simular_presupuesto():
     presupuesto_texto = entry_presupuesto.get()
     
-    # Verificar si el campo está vacío
     if not presupuesto_texto:
         messagebox.showerror("Error", "Por favor, ingresa un presupuesto.")
         return
@@ -161,6 +178,11 @@ def simular_presupuesto():
     except ValueError:
         messagebox.showerror("Error", "El presupuesto debe ser un número válido.")
         return
+
+    # Validación para presupuesto negativo
+    if presupuesto < 0:
+        messagebox.showerror("Error", "El presupuesto debe ser mayor o igual a 0.")
+        return
     
     conn = obtener_conexion()
     cursor = conn.cursor()
@@ -168,6 +190,7 @@ def simular_presupuesto():
     gastos_totales = cursor.fetchone()[0] or 0
     saldo_restante = presupuesto - gastos_totales
     messagebox.showinfo("Simulador de Presupuesto", f"Saldo restante: {saldo_restante:.2f} USD")
+
     conn.close()
 
 def ver_presupuesto():
@@ -182,8 +205,85 @@ def ver_presupuesto():
     except ValueError:
         messagebox.showerror("Error", "El presupuesto debe ser un número válido.")
         return
+
+    # Validación para presupuesto negativo
+    if presupuesto < 0:
+        messagebox.showerror("Error", "El presupuesto debe ser mayor o igual a 0.")
+        return
     
     messagebox.showinfo("Presupuesto Total", f"Tu presupuesto total es: {presupuesto:.2f} USD")
+
+
+def reiniciar_presupuesto():
+    confirmacion = messagebox.askyesno("Confirmar", "¿Estás seguro de que deseas reiniciar todos los datos?")
+    if confirmacion:
+        conn = obtener_conexion()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ingresos")
+        cursor.execute("DELETE FROM gastos")
+        conn.commit()
+        conn.close()
+        actualizar_progreso()
+        messagebox.showinfo("Reinicio", "Se han reiniciado todos los datos.")
+
+def mostrar_estado_cuenta():
+    """Muestra el estado de cuenta con los ingresos y gastos registrados."""
+    ventana_estado = tk.Toplevel(root)
+    ventana_estado.title("Estado de Cuenta")
+    ventana_estado.geometry("700x400")
+    ventana_estado.config(bg="#E0F7FA")
+
+    # Crear Treeview para mostrar los datos
+    tree = ttk.Treeview(ventana_estado, columns=("Tipo", "Monto", "Fecha", "Categoría"), show="headings")
+    tree.heading("Tipo", text="Tipo")
+    tree.heading("Monto", text="Monto (USD)")
+    tree.heading("Fecha", text="Fecha")
+    tree.heading("Categoría", text="Categoría")
+    tree.column("Tipo", width=100, anchor="center")
+    tree.column("Monto", width=100, anchor="center")
+    tree.column("Fecha", width=150, anchor="center")
+    tree.column("Categoría", width=150, anchor="center")
+    tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+    # Conectar a la base de datos y obtener los datos
+    conn = obtener_conexion()
+    cursor = conn.cursor()
+
+    # Obtener ingresos
+    cursor.execute("SELECT 'Ingreso' AS tipo, monto, fecha, 'General' AS categoria FROM ingresos")
+    ingresos = cursor.fetchall()
+
+    # Verificación de datos obtenidos de ingresos
+    print("Ingresos obtenidos:", ingresos)
+
+    # Obtener gastos
+    cursor.execute("SELECT 'Gasto' AS tipo, monto, fecha, categoria FROM gastos")
+    gastos = cursor.fetchall()
+
+    # Verificación de datos obtenidos de gastos
+    print("Gastos obtenidos:", gastos)
+
+    # Combinar ingresos y gastos
+    registros = ingresos + gastos  # Combina los dos conjuntos de datos
+
+    # Filtrar registros para asegurar que la fecha no sea None
+    registros = [registro for registro in registros if registro[2] is not None]
+
+    # Verificación de registros después del filtrado
+    print("Registros después de filtrado:", registros)
+
+    # Ordenar los registros por fecha
+    registros.sort(key=lambda x: x[2])  # Ordenar solo los que tienen una fecha válida
+
+    # Insertar registros en el Treeview
+    for registro in registros:
+        tree.insert("", "end", values=registro)
+
+    conn.close()
+
+    # Botón para cerrar la ventana
+    ttk.Button(ventana_estado, text="Cerrar", command=ventana_estado.destroy).pack(pady=10)
+
 
 # Interfaz principal
 root = tk.Tk()
@@ -228,6 +328,7 @@ entry_categoria.set('')
 
 ttk.Button(frame, text="Agregar Gasto", command=agregar_gasto).grid(row=5, column=0, columnspan=2, pady=10)
 
+
 # Presupuesto
 tk.Label(frame, text="Presupuesto Total (USD)", font=("Arial", 12), bg="#E0F7FA", fg="#004D40").grid(row=6, column=0, pady=5, sticky="w")
 entry_presupuesto = tk.Entry(frame, font=("Arial", 12))
@@ -248,7 +349,8 @@ label_cargando = tk.Label(root, text="", font=("Arial", 12), bg="#E0F7FA", fg="r
 # Botones de análisis
 frame_grafico = tk.Frame(root, bg="#E0F7FA")
 frame_grafico.pack(pady=20, padx=15)
-
+ttk.Button(frame_grafico, text="Ver Estado de Cuenta", command=mostrar_estado_cuenta).pack(fill="x", pady=5)
+ttk.Button(frame, text="Reiniciar Presupuesto", command=reiniciar_presupuesto).grid(row=9, column=0, columnspan=2, pady=10)
 ttk.Button(frame_grafico, text="Ver Análisis de Gastos", command=mostrar_analisis).pack(fill="x", pady=5)
 ttk.Button(frame_grafico, text="Ver Progreso Mensual", command=mostrar_progreso_mensual).pack(fill="x", pady=5)
 
