@@ -48,22 +48,24 @@ def agregar_ingreso():
     actualizar_progreso()
 
 def agregar_gasto():
-    monto = entry_ingreso.get()
-    categoria = entry_categoria.get()
-    fecha = entry_fecha.get() 
+    monto = entry_ingreso.get()  
+    fecha = entry_fecha.get()
+    categoria = combo_categoria.get()  
+   
 
     if not monto:
         messagebox.showerror("Error", "Por favor, ingresa el monto del gasto.")
         return
+    
+    if not fecha:
+        fecha = datetime.now().strftime("%Y-%m-%d") 
 
-    if not categoria:
+
+    if not categoria or categoria == 'Selecciona una categoría':
         messagebox.showerror("Error", "Por favor, selecciona una categoría de gasto.")
         return
-    
-    if not validar_fecha(fecha):
-        messagebox.showerror("Error", "La fecha no es válida. Debe estar en formato YYYY-MM-DD.")
-        return
 
+   
     try:
         monto = float(monto)
     except ValueError:
@@ -77,6 +79,10 @@ def agregar_gasto():
     conn.close()
     messagebox.showinfo("Gasto agregado", "Gasto registrado correctamente.")
     actualizar_progreso()
+    entry_ingreso.delete(0, tk.END)
+    combo_categoria.set("Selecciona una categoría")
+    label_cargando.config(text=f"Gasto de {monto} USD agregado en {categoria} para {fecha}")
+
 
 
 def actualizar_progreso():
@@ -244,6 +250,7 @@ def mostrar_estado_cuenta():
         cursor.execute("SELECT fecha, categoria, monto FROM gastos")
         gastos = cursor.fetchall()
 
+        tree.pack(fill=tk.BOTH, expand=True)
         # Limpiar Treeview
         for row in tree.get_children():
             tree.delete(row)
@@ -284,21 +291,19 @@ def mostrar_estado_cuenta():
     # Verificación de datos obtenidos de ingresos
     print("Ingresos obtenidos:", ingresos)
 
+     # Obtener ingresos
+    cursor.execute("SELECT 'Ingreso' AS tipo, monto, fecha, 'General' AS categoria FROM ingresos")
+    ingresos = cursor.fetchall()
+
     # Obtener gastos
     cursor.execute("SELECT 'Gasto' AS tipo, monto, fecha, categoria FROM gastos")
     gastos = cursor.fetchall()
-
-    # Verificación de datos obtenidos de gastos
-    print("Gastos obtenidos:", gastos)
 
     # Combinar ingresos y gastos
     registros = ingresos + gastos  # Combina los dos conjuntos de datos
 
     # Filtrar registros para asegurar que la fecha no sea None
-    registros = [registro for registro in registros if registro[2] is not None]
-
-    # Verificación de registros después del filtrado
-    print("Registros después de filtrado:", registros)
+    registros = [registro for registro in registros if registro[2] not in (None, "")]
 
     # Ordenar los registros por fecha
     registros.sort(key=lambda x: x[2])  # Ordenar solo los que tienen una fecha válida
@@ -306,6 +311,7 @@ def mostrar_estado_cuenta():
     # Insertar registros en el Treeview
     for registro in registros:
         tree.insert("", "end", values=registro)
+
 
     conn.close()
 
@@ -343,9 +349,9 @@ entry_fecha = DateEntry(frame, font=("Arial", 12), date_pattern="yyyy-mm-dd")
 entry_fecha.grid(row=1, column=1, pady=5)
 
 # Añadir el campo de categoría para los gastos
-tk.Label(frame, text="Categoría de Gasto", font=("Arial", 12), bg="#E0F7FA", fg="#004D40").grid(row=2, column=0, pady=5, sticky="w")
-entry_categoria = tk.Entry(frame, font=("Arial", 12))
-entry_categoria.grid(row=2, column=1, pady=5)
+tk.Label(frame, text="Categoría de Gasto", font=("Arial", 12)).grid(row=2, column=0, pady=5)
+combo_categoria = ttk.Combobox(frame, values=["Alimentación", "Transporte", "Vivienda", "Entretenimiento", "Otros"], font=("Arial", 12))
+combo_categoria.grid(row=2, column=1, pady=5)
 
 # Botón para agregar ingreso
 ttk.Button(frame, text="Agregar Ingreso", command=agregar_ingreso).grid(row=3, column=1, pady=10)
