@@ -12,6 +12,9 @@ import threading
 def obtener_conexion():
     return sqlite3.connect('finanzas.db')
 
+# Establecer el umbral para los gastos hormiga
+UMBRAL_GASTO_HORMIGA = 5.00  
+
 # Funciones
 def validar_fecha(fecha):
     """Valida si la fecha está en formato YYYY-MM-DD"""
@@ -51,7 +54,6 @@ def agregar_gasto():
     monto = entry_ingreso.get()  
     fecha = entry_fecha.get()
     categoria = combo_categoria.get()  
-   
 
     if not monto:
         messagebox.showerror("Error", "Por favor, ingresa el monto del gasto.")
@@ -60,17 +62,21 @@ def agregar_gasto():
     if not fecha:
         fecha = datetime.now().strftime("%Y-%m-%d") 
 
-
     if not categoria or categoria == 'Selecciona una categoría':
         messagebox.showerror("Error", "Por favor, selecciona una categoría de gasto.")
         return
 
-   
     try:
         monto = float(monto)
     except ValueError:
         messagebox.showerror("Error", "El monto debe ser un número válido.")
         return
+
+    # Verificar si el gasto es un gasto hormiga
+    if monto < UMBRAL_GASTO_HORMIGA:
+        respuesta = messagebox.askyesno("Gasto Hormiga", f"El monto de {monto} USD parece un gasto hormiga. ¿Estás seguro de que deseas agregarlo?")
+        if not respuesta:
+            return
 
     conn = obtener_conexion()
     cursor = conn.cursor()
@@ -82,8 +88,6 @@ def agregar_gasto():
     entry_ingreso.delete(0, tk.END)
     combo_categoria.set("Selecciona una categoría")
     label_cargando.config(text=f"Gasto de {monto} USD agregado en {categoria} para {fecha}")
-
-
 
 def actualizar_progreso():
     conn = obtener_conexion()
@@ -177,6 +181,7 @@ def generar_grafico_progreso_mensual():
 
     label_cargando.config(text="")
     label_cargando.pack_forget()
+
 def simular_presupuesto():
     presupuesto_texto = entry_presupuesto.get()
     
@@ -251,138 +256,83 @@ def mostrar_estado_cuenta():
         gastos = cursor.fetchall()
 
         tree.pack(fill=tk.BOTH, expand=True)
-        # Limpiar Treeview
-        for row in tree.get_children():
-            tree.delete(row)
+        for fecha, monto in ingresos:
+            tree.insert("", tk.END, values=("Ingreso", fecha, f"{monto:.2f}"))
 
-        # Mostrar ingresos
-        for ingreso in ingresos:
-            tree.insert("", "end", values=("Ingreso", ingreso[1], ingreso[0], "N/A"))
-
-        # Mostrar gastos
-        for gasto in gastos:
-            tree.insert("", "end", values=("Gasto", gasto[2], gasto[0], gasto[1]))  # Aquí se cambió el orden para mostrar monto, fecha y categoría
+        for fecha, categoria, monto in gastos:
+            tree.insert("", tk.END, values=("Gasto", fecha, categoria, f"{monto:.2f}"))
 
         conn.close()
 
-    # Crear Treeview para mostrar los datos
-    tree_window = tk.Toplevel(root)
-    tree_window.title("Estado de Cuenta")
-    
-    tree = ttk.Treeview(tree_window, columns=("Tipo", "Monto", "Fecha", "Categoría"), show="headings")
+    # Crear ventana con tabla
+    estado_ventana = tk.Toplevel(root)
+    estado_ventana.title("Estado de Cuenta")
+    tree = ttk.Treeview(estado_ventana, columns=("Tipo", "Fecha", "Categoría/Monto"), show="headings")
     tree.heading("Tipo", text="Tipo")
-    tree.heading("Monto", text="Monto (USD)")
     tree.heading("Fecha", text="Fecha")
-    tree.heading("Categoría", text="Categoría")
-
-    tree.pack(fill=tk.BOTH, expand=True)
-
-    cargar_datos_button = tk.Button(tree_window, text="Cargar Datos", command=cargar_datos)
-    cargar_datos_button.pack(pady=10)
-
-    # Conectar a la base de datos y obtener los datos
-    conn = obtener_conexion()
-    cursor = conn.cursor()
-
-    # Obtener ingresos
-    cursor.execute("SELECT 'Ingreso' AS tipo, monto, fecha, 'General' AS categoria FROM ingresos")
-    ingresos = cursor.fetchall()
-
-    # Verificación de datos obtenidos de ingresos
-    print("Ingresos obtenidos:", ingresos)
-
-     # Obtener ingresos
-    cursor.execute("SELECT 'Ingreso' AS tipo, monto, fecha, 'General' AS categoria FROM ingresos")
-    ingresos = cursor.fetchall()
-
-    # Obtener gastos
-    cursor.execute("SELECT 'Gasto' AS tipo, monto, fecha, categoria FROM gastos")
-    gastos = cursor.fetchall()
-
-    # Combinar ingresos y gastos
-    registros = ingresos + gastos  # Combina los dos conjuntos de datos
-
-    # Filtrar registros para asegurar que la fecha no sea None
-    registros = [registro for registro in registros if registro[2] not in (None, "")]
-
-    # Ordenar los registros por fecha
-    registros.sort(key=lambda x: x[2])  # Ordenar solo los que tienen una fecha válida
-
-    # Insertar registros en el Treeview
-    for registro in registros:
-        tree.insert("", "end", values=registro)
+    tree.heading("Categoría/Monto", text="Categoría/Monto")
+    
+    cargar_datos()
 
 
-    conn.close()
-
-    # Botón para cerrar la ventana
-    ttk.Button(tree_window, text="Cerrar", command=tree_window.destroy).pack(pady=10)
-
-
-
-# Interfaz principal
+# Crear interfaz gráfica
 root = tk.Tk()
 root.title("Gestión de Finanzas Personales")
-root.geometry("500x750")
-root.config(bg="#E0F7FA")
 
-# Estilo moderno
-style = ttk.Style()
-style.theme_use("clam")
-style.configure("TButton", font=("Arial", 12), padding=10, relief="flat", background="#00796B", foreground="white")
-style.map("TButton", background=[("active", "#004D40")])
+frame_izq = tk.Frame(root)
+frame_izq.pack(side=tk.LEFT, padx=20, pady=20)
 
-# Título
-header_label = tk.Label(root, text="Gestión de Finanzas Personales", font=("Arial", 18, "bold"), bg="#00796B", fg="#FFFFFF")
-header_label.pack(pady=20, padx=10)
+frame_derecho = tk.Frame(root)
+frame_derecho.pack(side=tk.LEFT, padx=20, pady=20)
 
-# Campos de ingreso
-frame = tk.Frame(root, bg="#E0F7FA")
-frame.pack(pady=10, padx=10)
+label_ingreso = tk.Label(frame_izq, text="Monto:")
+label_ingreso.grid(row=0, column=0, padx=10, pady=10)
 
-tk.Label(frame, text="Monto de Ingreso", font=("Arial", 12), bg="#E0F7FA", fg="#004D40").grid(row=0, column=0, pady=5, sticky="w")
-entry_ingreso = tk.Entry(frame, font=("Arial", 12))
-entry_ingreso.grid(row=0, column=1, pady=5)
+entry_ingreso = tk.Entry(frame_izq)
+entry_ingreso.grid(row=0, column=1, padx=10, pady=10)
 
-tk.Label(frame, text="Fecha (YYYY-MM-DD)", font=("Arial", 12), bg="#E0F7FA", fg="#004D40").grid(row=1, column=0, pady=5, sticky="w")
-entry_fecha = DateEntry(frame, font=("Arial", 12), date_pattern="yyyy-mm-dd")
-entry_fecha.grid(row=1, column=1, pady=5)
+label_fecha = tk.Label(frame_izq, text="Fecha (YYYY-MM-DD):")
+label_fecha.grid(row=1, column=0, padx=10, pady=10)
 
-# Añadir el campo de categoría para los gastos
-tk.Label(frame, text="Categoría de Gasto", font=("Arial", 12)).grid(row=2, column=0, pady=5)
-combo_categoria = ttk.Combobox(frame, values=["Alimentación", "Transporte", "Vivienda", "Entretenimiento", "Otros"], font=("Arial", 12))
-combo_categoria.grid(row=2, column=1, pady=5)
+entry_fecha = tk.Entry(frame_izq)
+entry_fecha.grid(row=1, column=1, padx=10, pady=10)
 
-# Botón para agregar ingreso
-ttk.Button(frame, text="Agregar Ingreso", command=agregar_ingreso).grid(row=3, column=1, pady=10)
+label_categoria = tk.Label(frame_izq, text="Categoría de Gasto:")
+label_categoria.grid(row=2, column=0, padx=10, pady=10)
 
-# Botón para agregar gasto
-ttk.Button(frame, text="Agregar Gasto", command=agregar_gasto).grid(row=4, column=1, pady=10)
+combo_categoria = ttk.Combobox(frame_izq, values=["Selecciona una categoría", "Alimentos", "Transporte", "Vivienda", "Entretenimiento", "Otros"])
+combo_categoria.set("Selecciona una categoría")
+combo_categoria.grid(row=2, column=1, padx=10, pady=10)
 
+# Botones
+boton_agregar_ingreso = tk.Button(frame_izq, text="Agregar Ingreso", command=agregar_ingreso)
+boton_agregar_ingreso.grid(row=3, column=0, padx=10, pady=10)
 
-# Presupuesto
-tk.Label(frame, text="Presupuesto Total (USD)", font=("Arial", 12), bg="#E0F7FA", fg="#004D40").grid(row=6, column=0, pady=5, sticky="w")
-entry_presupuesto = tk.Entry(frame, font=("Arial", 12))
-entry_presupuesto.grid(row=6, column=1, pady=5)
+boton_agregar_gasto = tk.Button(frame_izq, text="Agregar Gasto", command=agregar_gasto)
+boton_agregar_gasto.grid(row=3, column=1, padx=10, pady=10)
 
-ttk.Button(frame, text="Simular Presupuesto", command=simular_presupuesto).grid(row=7, column=0, columnspan=2, pady=10)
+label_cargando = tk.Label(frame_izq, text="")
+label_cargando.grid(row=4, column=0, columnspan=2, padx=10, pady=10)
 
-# Botón para ver presupuesto
-ttk.Button(frame, text="Ver Presupuesto", command=ver_presupuesto).grid(row=8, column=0, columnspan=2, pady=10)
+label_progreso = tk.Label(frame_izq, text="Progreso: 0.00 USD")
+label_progreso.grid(row=5, column=0, columnspan=2, padx=10, pady=10)
 
-# Progreso
-label_progreso = tk.Label(root, text="Progreso: 0.00 USD", font=("Arial", 14), bg="#E0F7FA", fg="#004D40")
-label_progreso.pack(pady=10)
+boton_mostrar_analisis = tk.Button(frame_derecho, text="Mostrar Análisis de Gastos", command=mostrar_analisis)
+boton_mostrar_analisis.pack(pady=10)
 
-# Cargando
-label_cargando = tk.Label(root, text="", font=("Arial", 12), bg="#E0F7FA", fg="red")
+boton_mostrar_progreso_mensual = tk.Button(frame_derecho, text="Mostrar Progreso Mensual", command=mostrar_progreso_mensual)
+boton_mostrar_progreso_mensual.pack(pady=10)
 
-# Botones de análisis
-frame_grafico = tk.Frame(root, bg="#E0F7FA")
-frame_grafico.pack(pady=20, padx=15)
-ttk.Button(frame_grafico, text="Ver Estado de Cuenta", command=mostrar_estado_cuenta).pack(fill="x", pady=5)
-ttk.Button(frame, text="Reiniciar Presupuesto", command=reiniciar_presupuesto).grid(row=9, column=0, columnspan=2, pady=10)
-ttk.Button(frame_grafico, text="Ver Análisis de Gastos", command=mostrar_analisis).pack(fill="x", pady=5)
-ttk.Button(frame_grafico, text="Ver Progreso Mensual", command=mostrar_progreso_mensual).pack(fill="x", pady=5)
+boton_simular_presupuesto = tk.Button(frame_derecho, text="Simular Presupuesto", command=simular_presupuesto)
+boton_simular_presupuesto.pack(pady=10)
+
+boton_ver_presupuesto = tk.Button(frame_derecho, text="Ver Presupuesto", command=ver_presupuesto)
+boton_ver_presupuesto.pack(pady=10)
+
+boton_reiniciar_presupuesto = tk.Button(frame_derecho, text="Reiniciar Presupuesto", command=reiniciar_presupuesto)
+boton_reiniciar_presupuesto.pack(pady=10)
+
+boton_ver_estado = tk.Button(frame_derecho, text="Ver Estado de Cuenta", command=mostrar_estado_cuenta)
+boton_ver_estado.pack(pady=10)
 
 root.mainloop()
