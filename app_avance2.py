@@ -60,7 +60,7 @@ def agregar_gasto():
         return
     
     if not fecha:
-        fecha = datetime.now().strftime("%Y-%m-%d") 
+        fecha = datetime.datetime.now().strftime("%Y-%m-%d") 
 
     if not categoria or categoria == 'Selecciona una categoría':
         messagebox.showerror("Error", "Por favor, selecciona una categoría de gasto.")
@@ -80,7 +80,7 @@ def agregar_gasto():
 
     conn = obtener_conexion()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO gastos (monto, categoria) VALUES (?, ?)", (monto, categoria))
+    cursor.execute("INSERT INTO gastos (monto, categoria, fecha) VALUES (?, ?, ?)", (monto, categoria, fecha))
     conn.commit()
     conn.close()
     messagebox.showinfo("Gasto agregado", "Gasto registrado correctamente.")
@@ -157,7 +157,7 @@ def generar_grafico_progreso_mensual():
         y=df["Ingresos"], 
         name="Ingresos", 
         marker_color="lightseagreen", 
-        width=0.1  # Hacer las barras más delgadas (ancho más pequeño)
+        width=0.1
     ))
 
     fig.add_trace(go.Bar(
@@ -165,15 +165,15 @@ def generar_grafico_progreso_mensual():
         y=df["Gastos"], 
         name="Gastos", 
         marker_color="lightcoral", 
-        width=0.1  # Hacer las barras más delgadas (ancho más pequeño)
+        width=0.1
     ))
 
     fig.update_layout(
         barmode="group", 
         title="Progreso Mensual: Ingresos vs Gastos", 
         template="plotly_white",
-        height=1500,  # Aumentar la altura del gráfico
-        margin={"t": 50, "b": 50, "l": 50, "r": 50}  # Ajustar márgenes si es necesario
+        height=1500,
+        margin={"t": 50, "b": 50, "l": 50, "r": 50}
     )
 
     fig.show()
@@ -195,7 +195,6 @@ def simular_presupuesto():
         messagebox.showerror("Error", "El presupuesto debe ser un número válido.")
         return
 
-    # Validación para presupuesto negativo
     if presupuesto < 0:
         messagebox.showerror("Error", "El presupuesto debe ser mayor o igual a 0.")
         return
@@ -222,7 +221,6 @@ def ver_presupuesto():
         messagebox.showerror("Error", "El presupuesto debe ser un número válido.")
         return
 
-    # Validación para presupuesto negativo
     if presupuesto < 0:
         messagebox.showerror("Error", "El presupuesto debe ser mayor o igual a 0.")
         return
