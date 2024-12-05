@@ -114,16 +114,24 @@ def generar_grafico_analisis():
     datos = cursor.fetchall()
 
     if datos:
-        df = pd.DataFrame(datos, columns=["Categoria", "Total"])
-        fig = go.Figure(data=[go.Pie(labels=df["Categoria"], values=df["Total"], textinfo="label+percent", hole=0.3)])
-        fig.update_layout(title="Distribución de Gastos por Categoría", template="plotly_white")
-        fig.show()
+        try:
+            df = pd.DataFrame(datos, columns=["Categoria", "Total"])
+            if df.empty:
+                messagebox.showwarning("Sin datos", "No hay datos suficientes para generar un gráfico.")
+                return
+            fig = go.Figure(data=[go.Pie(labels=df["Categoria"], values=df["Total"], textinfo="label+percent", hole=0.3)])
+            fig.update_layout(title="Distribución de Gastos por Categoría", template="plotly_white")
+            fig.show()
+        except Exception as e:
+            print(f"Error al generar gráfico: {e}")
+            messagebox.showerror("Error", "Hubo un problema al generar el gráfico.")
     else:
         messagebox.showinfo("Sin datos", "No hay gastos registrados para analizar.")
-    conn.close()
 
+    conn.close()
     label_cargando.config(text="")
     label_cargando.pack_forget()
+
 
 def mostrar_progreso_mensual():
     label_cargando.config(text="Generando gráfico, por favor espere...")
